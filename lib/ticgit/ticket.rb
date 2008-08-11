@@ -3,7 +3,7 @@ module TicGit
   
     attr_reader :base, :opts
     attr_accessor :ticket_id, :ticket_name
-    attr_accessor :title, :state, :milestone, :assigned, :opened
+    attr_accessor :title, :description, :state, :milestone, :assigned, :opened
     attr_accessor :comments, :tags, :attachments # arrays
     
     def initialize(base, options = {})
@@ -13,6 +13,7 @@ module TicGit
       @base = base
       @opts = options || {}
       
+      @description = options.delete(:description)
       @state = 'open' # by default
       @comments = []
       @tags = []
@@ -33,14 +34,19 @@ module TicGit
       t = Ticket.new(base, options)
       t.ticket_name = ticket_name
       
-      title, date = self.parse_ticket_name(ticket_name)
+      basic_title, date = self.parse_ticket_name(ticket_name)
       
-      t.title = title
+      # t.title will be overridden below if the file TICKET_TITLE exists
+      t.title = basic_title      
       t.opened = date
       
       ticket_hash['files'].each do |fname, value|
         if fname == 'TICKET_ID'
-          tid = value
+          t.ticket_id = value
+        elsif fname == 'TICKET_TITLE'
+          t.title = base.git.gblob(value).contents rescue nil
+        elsif fname == 'TICKET_DESCRIPTION'
+          t.description = base.git.gblob(value).contents rescue nil
         else
           # matching
           data = fname.split('_')
@@ -59,7 +65,7 @@ module TicGit
         end
       end
       
-      t.ticket_id = tid
+
       t
     end
     
@@ -82,6 +88,8 @@ module TicGit
           base.new_file('TICKET_ID', ticket_name)
           base.new_file('ASSIGNED_' + email, email)
           base.new_file('STATE_' + state, state)
+          base.new_file('TICKET_TITLE',self.title)
+          base.new_file('TICKET_DESCRIPTION',self.description) if self.description
 
           # add initial comment
           #COMMENT_080315060503045__schacon_at_gmail

@@ -58,7 +58,8 @@ module TicGit
       elsif m = options[:message]
         tic.ticket_comment(m, ticket_id)
       else
-        if message = get_editor_message
+        message, meta = get_editor_message
+        if message
           tic.ticket_comment(message.join(''), ticket_id)
         end
       end
@@ -138,23 +139,16 @@ module TicGit
         File.open(message_file, 'w') do |f|
           f.puts "\n# ---"
           f.puts "tags:"
-          f.puts "# first line will be the title of the tic, the rest will be the first comment"
-          f.puts "# if you would like to add initial tags, put them on the 'tags:' line, comma delim"
+          f.puts "# The first line will be the title of the ticket,"
+          f.puts "# the rest will be the description. If you would like to add initial tags,"
+          f.puts "# put them on the 'tags:' line, comma delimited"
         end
         
-        if message = get_editor_message(message_file)
-          title = message.shift
-          if title && title.chomp.length > 0
-            title = title.chomp
-            if message.last[0, 5] == 'tags:'
-              tags = message.pop
-              tags = tags.gsub('tags:', '')
-              tags = tags.split(',').map { |t| t.strip }
-            end
-            if message.size > 0
-              comment = message.join("")
-            end
-            ticket_show(@tic.ticket_new(title, :comment => comment, :tags => tags))
+        message, meta = get_editor_message(message_file)
+        if message
+          title, description, tags = parse_editor_message(message,meta)
+          if title and !title.empty?
+            ticket_show(@tic.ticket_new(title, :description => description, :tags => tags))
           else
             puts "You need to at least enter a title"
           end
@@ -175,8 +169,12 @@ module TicGit
       puts
       puts just('Title', 10) + ': ' + t.title
       puts just('TicId', 10) + ': ' + t.ticket_id
+      if t.description
+        desc = t.description.split("\n").map{|l| " "*12 + l.strip}.join("\n").lstrip
+        puts just('Descr.',10) + ': ' + desc
+      end
       puts
-      puts just('Assigned', 10) + ': ' + t.assigned.to_s 
+      puts just('Assigned', 10) + ': ' + t.assigned.to_s
       puts just('Opened', 10) + ': ' + t.opened.to_s + ' (' + days_ago + ' days)'
       puts just('State', 10) + ': ' + t.state.upcase
       if !t.tags.empty?
@@ -209,13 +207,31 @@ module TicGit
       
       editor = ENV["EDITOR"] || 'vim'
       system("#{editor} #{message_file}");
-      message = File.readlines(message_file)
-      message = message.select { |line| line[0, 1] != '#' } # removing comments   
-      if message.empty?
-        return false
+      message = File.read(message_file)
+      
+      # We must have some content before the # --- line
+      message, meta  = message.split("# ---")
+      if message =~ /[^\s]+/m
+        return [message,meta]
       else
-        return message
+        return [false,false]
       end   
+    end
+    
+    def parse_editor_message(message, meta)
+      message.strip!
+      puts message.inspect
+      title, description = message.split(/\r?\n/,2).map { |t| t.strip }
+      tags = []
+      # Strip comments from meta block
+      meta.gsub!(/^\s*#.*$/, "")
+      meta.split("\n").each do |line|
+        if line[0, 5] == 'tags:'
+          tags = line.gsub('tags:', '')
+          tags = tags.split(',').map { |t| t.strip }
+        end
+      end
+      [title, description, tags]
     end
     
     def just(value, size, side = 'l')
