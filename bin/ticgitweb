@@ -5,10 +5,11 @@
 # 
 # some of the sinatra code borrowed from sr's git-wiki
 #
-# author : Scott Chacon (schacon@gmail.com)
+# author: Flurin Egger
+# original author : Scott Chacon (schacon@gmail.com)
 #
 
-%w(rubygems sinatra git ticgit haml).each do |dependency| 
+%w(rubygems sinatra git ticgit haml sass).each do |dependency| 
   begin
     require dependency
   rescue LoadError => e
