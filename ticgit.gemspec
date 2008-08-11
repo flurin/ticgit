@@ -1,8 +1,8 @@
 Gem::Specification.new do |s|
     s.platform  =   Gem::Platform::RUBY
     s.name      =   "ticgit"
-    s.version   =   "0.3.5"
-    s.date      =   "2008-05-10"
+    s.version   =   "0.3.5.20080811"
+    s.date      =   "2008-08-11"
     s.author    =   "Scott Chacon"
     s.email     =   "schacon@gmail.com"
     s.summary   =   "A distributed ticketing system for Git projects."
