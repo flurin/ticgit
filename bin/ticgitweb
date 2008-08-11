@@ -149,75 +149,87 @@ def list(title = 'all')
       %p No tickets found.
     - else
       %table.long
-        - c = 'even'
-        - @tickets.each do |t|
-          %tr{:class => (c == 'even' ? c = 'odd' : c = 'even') }
-            %td
-              %a{:href => "/ticket/#{t.ticket_id}" }
-                %code= t.ticket_id[0,6]
-            %td= t.title
-            %td{:class => t.state}= t.state
-            %td= t.opened.strftime("%m/%d")
-            %td= t.assigned_name
-            %td
-              - t.tags.each do |tag|
-                %a{:href => "/tag/#{tag}"}= tag
+        %thead
+          %tr
+            %th= "SHA"
+            %th.ticket= "Ticket"
+            %th= "State"
+            %th= "Created at"
+            %th= "Created by"
+            %th= "Tags" 
+        %tbody
+          - c = 'even'
+          - @tickets.each do |t|
+            %tr{:class => (c == 'even' ? c = 'odd' : c = 'even') }
+              %td
+                %a{:href => "/ticket/#{t.ticket_id}" }
+                  %code= t.ticket_id[0,6]
+              %td
+                %strong
+                  %a{:href => "/ticket/#{t.ticket_id}" }= t.title
+                .content~ t.description
+              %td{:class => t.state}= t.state
+              %td= t.opened.strftime("%m/%d")
+              %td= t.assigned_name
+              %td
+                - t.tags.each do |tag|
+                  %a.tag{:href => "/tag/#{tag}"}= tag
   })
 end
 
 def show
   layout('ticket', %q{
-  %center
-    %h1= @ticket.title
+  %h1= @ticket.title
+  .content~ @ticket.description
+  %hr/
+  %form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'POST'}
+    %table.twocol
+      %tr
+        %th TicId
+        %td
+          %code= @ticket.ticket_id
+      %tr
+        %th Assigned
+        %td= @ticket.assigned
+      %tr
+        %th Opened
+        %td= @ticket.opened
+      %tr
+        %th State
+        %td{:class => @ticket.state}
+          %table{:width => '300'}
+            %tr
+              %td{:width=>'90%'}= @ticket.state
+              - $ticgit.tic_states.select { |s| s != @ticket.state}.each do |st|
+                %td{:class => st}
+                  %a{:href => "/a/change_state/#{@ticket.ticket_id}/#{st}"}= st[0,2]
+      %tr
+        %th Tags
+        %td
+          - @ticket.tags.each do |t|
+            %a.tag{:href => "/tag/#{t}"}= t
+          %div.addtag
+            %input{:name => 'tags'}
+            %input{:type => 'submit', :value => 'add tag'}
   
-    %form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'POST'}
-      %table
-        %tr
-          %th TicId
-          %td
-            %code= @ticket.ticket_id
-        %tr
-          %th Assigned
-          %td= @ticket.assigned
-        %tr
-          %th Opened
-          %td= @ticket.opened
-        %tr
-          %th State
-          %td{:class => @ticket.state}
-            %table{:width => '300'}
-              %tr
-                %td{:width=>'90%'}= @ticket.state
-                - $ticgit.tic_states.select { |s| s != @ticket.state}.each do |st|
-                  %td{:class => st}
-                    %a{:href => "/a/change_state/#{@ticket.ticket_id}/#{st}"}= st[0,2]
-        %tr
-          %th Tags
-          %td
-            - @ticket.tags.each do |t|
-              %a{:href => "/tag/#{t}"}= t
-            %div.addtag
-              %input{:name => 'tags'}
-              %input{:type => 'submit', :value => 'add tag'}
-    
-    %h3 Comments
-    %form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'POST'}
-      %div
-        %textarea{:name => 'comment', :cols => 50}
-        %br
-        %input{:type => 'submit', :value => 'add comment'}
-        
-    %div.comments
-      - @ticket.comments.reverse.each do |t|
-        %div.comment
-          %span.head
-            Added
-            = t.added.strftime("%m/%d %H:%M")
-            by
-            = t.user
-          %div.comment-text
-            = t.comment
-        %br
+  %h3 Comments
+  %form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'POST'}
+    %div
+      %textarea{:name => 'comment', :cols => 50}
+      %br
+      %input{:type => 'submit', :value => 'add comment'}
+      
+  %div.comments
+    - @ticket.comments.reverse.each do |t|
+      %div.comment
+        %span.head
+          Added
+          = t.added.strftime("%m/%d %H:%M")
+          by
+          = t.user
+        %div.comment-text
+          = t.comment
+      %br
   })
 end
 
@@ -256,6 +268,13 @@ a.exists
 a.unknown
   font-style: italic
 
+a.tag
+  padding: 2px 5px
+  background: #000
+  color: #fff
+  font-weight: normal
+  font-size: 80%
+
 .comments
   margin: 10px 20px
   .comment
@@ -268,8 +287,16 @@ a.unknown
   
 table.long
   width: 100%
-  
+
+table.twocol
+  background: #f2f2f2
+  th
+    width: 30%
+
 table
+  border-collapse: collapse
+  td,th
+    vertical-align: top
   tr.even
     td
       background: #eee
@@ -279,10 +306,13 @@ table
       
 table
   tr
+    td,th
+      padding: 3px 5px  
     th
       text-align: left
-      padding: 3px
       vertical-align: top
+    th.ticket
+      width: 50%
     td.open
       background: #ada
     td.resolved
@@ -291,6 +321,15 @@ table
       background: #dda
     td.invalid
       background: #aaa  
+
+strong a
+  text-decoration: none
+
+table
+  thead
+    tr
+      td,th
+        border-bottom: 1px solid #000
       
 .submit
   font-size: large
