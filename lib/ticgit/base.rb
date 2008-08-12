@@ -109,14 +109,8 @@ module TicGit
       # SORTING
       if field = options[:order]
         field, type = field.split('.')
-        case field
-        when 'assigned'
-          ts = ts.sort { |a, b| a.assigned <=> b.assigned }
-        when 'state'
-          ts = ts.sort { |a, b| a.state <=> b.state }
-        when 'date'
-          ts = ts.sort { |a, b| a.opened <=> b.opened }
-        end    
+        field = "opened" if field == "date" || field.nil?
+        ts = sort_list_by_keys(ts,[field,:ticket_id])
         ts = ts.reverse if type == 'desc'
       else
         # default list
@@ -149,6 +143,19 @@ module TicGit
 
       save_state
       ts
+    end
+    
+    
+    def sort_list_by_keys(list,keys)
+      return list if keys.find{|k| !list.first.respond_to?(k) }
+      list.sort do |a,b|
+        value,i = 0,0
+        while (keys.size > i && value == 0) do 
+          value = a.send(keys[i]) <=> b.send(keys[i])
+          i += 1
+        end
+        value
+      end
     end
     
     # returns single Ticket
