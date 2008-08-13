@@ -65,7 +65,7 @@ post '/t/new' do
   title = params[:title].to_s.strip
   if title.size > 1
     tags = params[:tags].split(',').map { |t| t.strip } rescue nil  
-    t = $ticgit.ticket_new(title, {:comment => params[:comment].strip, :tags => tags})
+    t = $ticgit.ticket_new(title, {:description => params[:description].strip, :tags => tags})
     redirect '/ticket/' + t.ticket_id.to_s
   else
     redirect '/t/new'
@@ -133,21 +133,21 @@ end
 def new_ticket
   layout('New Ticket', %q{
       %h1 Create a New Ticket
-      %form{:action => '/t/new', :method => 'POST'}
+      %form{:action => '/t/new', :method => 'post'}
         %table
           %tr
             %th Title
             %td 
               %input{:type => 'text', :name => 'title', :size => 30}
           %tr
+            %th Description
+            %td 
+              %textarea{:rows => 15, :cols => 30, :name => 'description'}              
+          %tr
             %th Tags
             %td
               %input{:name => 'tags', :size => 30}
               %small (comma delimited)
-          %tr
-            %th Comment
-            %td 
-              %textarea{:name => 'comment', :rows => 15, :cols => 30}
           %tr
             %td
             %td
@@ -196,7 +196,7 @@ def show
       %h1= @ticket.title
       .content~ @ticket.description
       %hr/
-      %form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'POST'}
+      %form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'post'}
         %table.twocol
           %tr
             %th TicId
@@ -227,7 +227,7 @@ def show
                 %input{:type => 'submit', :value => 'add tag'}
   
       %h3 Comments
-      %form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'POST'}
+      %form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'post'}
         %div
           %textarea{:name => 'comment', :cols => 50}
           %br
