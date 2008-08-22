@@ -22,42 +22,48 @@ end
 
 $ticgit = TicGit.open('.')
 
+# Always load saved searches. (used in navigation)
+before do
+  @saved = $ticgit.config['list_options'].keys rescue []
+end
+
+# Stylesheet
 get('/_stylesheet.css') do
   header("Content-Type" =>  "text/css;charset=utf-8")
-  Sass::Engine.new(File.read(__FILE__).gsub(/.*__END__/m, '')).render 
+  sass :stylesheet_all
 end
 
 # ticket list view
 get '/' do
   @tickets = $ticgit.ticket_list(:order => 'date.desc')
-  haml(list('all'))
+  haml :list, :locals => {:title => "All tickets"}
 end
 
 get '/fs/:state' do
   @tickets = $ticgit.ticket_list(:state => params[:state], :order => 'date.desc')
-  haml(list(params[:state]))
+  haml :list, :locals => {:title => "#{params[:state].to_s.capitalize} tickets"}  
 end
 
 get '/tag/:tag' do
   @tickets = $ticgit.ticket_list(:tag => params[:tag], :order => 'date.desc')
-  haml(list(params[:tag]))
+  haml :list, :locals => {:title => "All tickets with tag '#{params[:tag]}'"}
 end
 
 get '/sv/:saved_view' do
   @tickets = $ticgit.ticket_list(:saved => params[:saved_view])
-  haml(list(params[:saved_view]))
+  haml :list, :locals => {:title => "All tickets in view '#{params[:saved_view]}'"}  
 end
 
 # ticket single view
 get '/ticket/:ticket' do
   @ticket = $ticgit.ticket_show(params[:ticket])
-  haml(show)
+  haml :show, :locals => {:title => "Ticket #{@ticket.ticket_id}"}
 end
 
 
 # add ticket
 get '/t/new' do
-  haml(new_ticket)
+  haml :new, :locals => {:title => "Create new ticket"}
 end
 
 # add ticket finalize
@@ -91,19 +97,18 @@ get '/a/change_state/:ticket/:state' do
   redirect '/ticket/' + params[:ticket]
 end
 
+use_in_file_templates!
 
-def layout(title, content)
-  @saved = $ticgit.config['list_options'].keys rescue []
-  %Q(
+__END__
+## layout
 :plain
   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 %html{:xmlns => "http://www.w3.org/1999/xhtml", "xml:lang" =>  "en", :lang=>"en"}
   %head
-    %title #{title}
-    %link{:rel => 'stylesheet', :href => '/_stylesheet.css', :type => 'text/css', :media => 'screen'}
+    %title= title
+    %link{:rel => 'stylesheet', :href => '/_stylesheet.css', :type => 'text/css', :media => 'all'}
     %meta{'http-equiv' => 'Content-Type', :content => 'text/html; charset=utf-8'}
-
   %body
     #wrapper
       #action
@@ -119,135 +124,123 @@ def layout(title, content)
           %a{:href => '/fs/hold'} Hold
         %li 
           %a{:href => '/fs/invalid'} Invalid
-        - if !@saved.empty?
+        - if @saved && !@saved.empty?
           %li | Saved:
           %ul.saved
           - @saved.each do |s|
             %li 
               %a{:href => "/sv/\#{s}"}= s
 
-      #{content}
-  )
-end
+      = yield
 
-def new_ticket
-  layout('New Ticket', %q{
-      %h1 Create a New Ticket
-      %form{:action => '/t/new', :method => 'post'}
-        %table
-          %tr
-            %th Title
-            %td 
-              %input{:type => 'text', :name => 'title', :size => 30}
-          %tr
-            %th Description
-            %td 
-              %textarea{:rows => 15, :cols => 30, :name => 'description'}              
-          %tr
-            %th Tags
-            %td
-              %input{:name => 'tags', :size => 30}
-              %small (comma delimited)
-          %tr
-            %td
-            %td
-              %input{:type => 'submit', :value => 'Create Ticket'}
-  })
-end
+## list
+%h1= title
+- if @tickets.empty?
+  %p No tickets found.
+- else
+  %table.long
+    %thead
+      %tr
+        %th SHA
+        %th.ticket Ticket
+        %th State
+        %th Created&nbsp;at
+        %th Created&nbsp;by
+        %th Tags
+    %tbody
+      - c = 'even'
+      - @tickets.each do |t|
+        %tr{:class => (c == 'even' ? c = 'odd' : c = 'even') }
+          %td
+            %a{:href => "/ticket/#{t.ticket_id}" }
+              %code= t.ticket_id[0,6]
+          %td
+            %strong
+              %a{:href => "/ticket/#{t.ticket_id}" }= t.title
+            .content~ t.description
+          %td{:class => t.state}= t.state
+          %td= t.opened.strftime("%m/%d")
+          %td= t.assigned_name
+          %td
+            - t.tags.each do |tag|
+              %a.tag{:href => "/tag/#{tag}"}= tag
 
-def list(title = 'all')
-  @title = title
-  layout(title + ' tickets', %q{
-      %h1= "#{@title.capitalize} tickets"
-      - if @tickets.empty?
-        %p No tickets found.
-      - else
-        %table.long
-          %thead
-            %tr
-              %th= "SHA"
-              %th.ticket= "Ticket"
-              %th= "State"
-              %th= "Created&nbsp;at"
-              %th= "Created&nbsp;by"
-              %th= "Tags" 
-          %tbody
-            - c = 'even'
-            - @tickets.each do |t|
-              %tr{:class => (c == 'even' ? c = 'odd' : c = 'even') }
-                %td
-                  %a{:href => "/ticket/#{t.ticket_id}" }
-                    %code= t.ticket_id[0,6]
-                %td
-                  %strong
-                    %a{:href => "/ticket/#{t.ticket_id}" }= t.title
-                  .content~ t.description
-                %td{:class => t.state}= t.state
-                %td= t.opened.strftime("%m/%d")
-                %td= t.assigned_name
-                %td
-                  - t.tags.each do |tag|
-                    %a.tag{:href => "/tag/#{tag}"}= tag
-  })
-end
+## show
+%h1= @ticket.title
+.content~ @ticket.description
+%hr/
+%form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'post'}
+  %table.twocol
+    %tr
+      %th TicId
+      %td
+        %code= @ticket.ticket_id
+    %tr
+      %th Assigned
+      %td= @ticket.assigned
+    %tr
+      %th Opened
+      %td= @ticket.opened
+    %tr
+      %th State
+      %td{:class => @ticket.state}
+        %table{:width => '300'}
+          %tr
+            %td{:width=>'90%'}= @ticket.state
+            - $ticgit.tic_states.select { |s| s != @ticket.state}.each do |st|
+              %td{:class => st}
+                %a{:href => "/a/change_state/#{@ticket.ticket_id}/#{st}"}= st[0,2]
+    %tr
+      %th Tags
+      %td
+        - @ticket.tags.each do |t|
+          %a.tag{:href => "/tag/#{t}"}= t
+        %div.addtag
+          %input{:name => 'tags'}
+          %input{:type => 'submit', :value => 'add tag'}
 
-def show
-  layout('ticket', %q{
-      %h1= @ticket.title
-      .content~ @ticket.description
-      %hr/
-      %form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'post'}
-        %table.twocol
-          %tr
-            %th TicId
-            %td
-              %code= @ticket.ticket_id
-          %tr
-            %th Assigned
-            %td= @ticket.assigned
-          %tr
-            %th Opened
-            %td= @ticket.opened
-          %tr
-            %th State
-            %td{:class => @ticket.state}
-              %table{:width => '300'}
-                %tr
-                  %td{:width=>'90%'}= @ticket.state
-                  - $ticgit.tic_states.select { |s| s != @ticket.state}.each do |st|
-                    %td{:class => st}
-                      %a{:href => "/a/change_state/#{@ticket.ticket_id}/#{st}"}= st[0,2]
-          %tr
-            %th Tags
-            %td
-              - @ticket.tags.each do |t|
-                %a.tag{:href => "/tag/#{t}"}= t
-              %div.addtag
-                %input{:name => 'tags'}
-                %input{:type => 'submit', :value => 'add tag'}
-  
-      %h3 Comments
-      %form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'post'}
-        %div
-          %textarea{:name => 'comment', :cols => 50}
-          %br
-          %input{:type => 'submit', :value => 'add comment'}
-      
-      %div.comments
-        - @ticket.comments.reverse.each do |t|
-          %div.comment
-            %span.head
-              Added
-              = t.added.strftime("%m/%d %H:%M")
-              by
-              = t.user
-            %div.comment-text
-              = t.comment
-          %br
-  })
-end
+%h3 Comments
+%form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'post'}
+  %div
+    %textarea{:name => 'comment', :cols => 50}
+    %br
+    %input{:type => 'submit', :value => 'add comment'}
+    
+%div.comments
+  - @ticket.comments.reverse.each do |t|
+    %div.comment
+      %span.head
+        Added
+        = t.added.strftime("%m/%d %H:%M")
+        by
+        = t.user
+    %div.comment-text
+      = t.comment
+    %br
 
-__END__
+## new
+%h1 Create a New Ticket
+%form{:action => '/t/new', :method => 'post'}
+  %table
+    %tr
+      %th Title
+      %td 
+        %input{:type => 'text', :name => 'title', :size => 30}
+    %tr
+      %th Description
+      %td 
+        %textarea{:rows => 15, :cols => 30, :name => 'description'}              
+    %tr
+      %th Tags
+      %td
+        %input{:name => 'tags', :size => 30}
+        %small (comma delimited)
+    %tr
+      %td
+      %td
+        %input{:type => 'submit', :value => 'Create Ticket'}
+
+## stylesheet_all
 body
   :font
     family: Verdana, Arial, "Bitstream Vera Sans", Helvetica, sans-serif
@@ -394,4 +387,3 @@ table
   background-color: #e0e0e0
   font-variant: small-caps
   text-decoration: none
-
