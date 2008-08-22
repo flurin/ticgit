@@ -27,10 +27,14 @@ before do
   @saved = $ticgit.config['list_options'].keys rescue []
 end
 
-# Stylesheet
+# Stylesheets
 get('/_stylesheet.css') do
   header("Content-Type" =>  "text/css;charset=utf-8")
   sass :stylesheet_all
+end
+get('/_print.css') do
+  header("Content-Type" =>  "text/css;charset=utf-8")
+  sass :stylesheet_print
 end
 
 # ticket list view
@@ -108,6 +112,7 @@ __END__
   %head
     %title= title
     %link{:rel => 'stylesheet', :href => '/_stylesheet.css', :type => 'text/css', :media => 'all'}
+    %link{:rel => 'stylesheet', :href => '/_print.css', :type => 'text/css', :media => 'print'}    
     %meta{'http-equiv' => 'Content-Type', :content => 'text/html; charset=utf-8'}
   %body
     #wrapper
@@ -387,3 +392,12 @@ table
   background-color: #e0e0e0
   font-variant: small-caps
   text-decoration: none
+
+## stylesheet_print
+#navigation, #action
+  display: none
+  
+table
+  tr.odd, tr.even
+    td
+      border-bottom: 1px solid #ddd
