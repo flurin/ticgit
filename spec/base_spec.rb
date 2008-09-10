@@ -25,6 +25,12 @@ describe TicGit::Base do
     list.first.should be_an_instance_of(TicGit::Ticket)
     list.size.should eql(2)
   end
+  
+  it "should be able to use more than just alphanumeric characters in title" do
+    id = @ticgit.ticket_new('under_scores do.ts,comma -- colon:semicolon;').ticket_id
+    ticket = @ticgit.ticket_list.find { |t| t.ticket_id == id }
+    ticket.title.should == 'under_scores do.ts,comma colon:semicolon;'
+  end
 
   it "should be able to change the state of a ticket" do
     tic = @ticgit.ticket_list.first
@@ -76,7 +82,7 @@ describe TicGit::Base do
     tics = @ticgit.ticket_list(:state => 'resolved')
     tics.size.should eql(1)
     tics = @ticgit.ticket_list(:state => 'open')
-    tics.size.should eql(2)
+    tics.size.should eql(3)
   end
 
   it "should be able to save and recall filtered ticket lists" do
