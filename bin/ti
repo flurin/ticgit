@@ -2,10 +2,9 @@
 
 # This is a command line client that does all the actual tic commands
 # 
-# author : Scott Chacon (schacon@gmail.com)
-#
+# authors: Scott Chacon <schacon@gmail.com>
+#          Mislav Marohnić <mislav.marohnic@gmail.com>
 
-require 'rubygems'
-require 'ticgit'
-#require File.dirname(__FILE__) + '/../lib/ticgit'
-TicGit::CLI.execute
+require File.dirname(__FILE__) + "/../lib/ticgit"
+
+TicGit::CLI::start()
