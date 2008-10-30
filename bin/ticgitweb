@@ -95,7 +95,11 @@ post '/t/new' do
   if title.size > 1
     tags = params[:tags].split(',').map { |t| t.strip } rescue nil  
     t = $ticgit.ticket_new(title, {:description => params[:description].strip, :tags => tags})
-    redirect '/ticket/' + t.ticket_id.to_s
+    if params[:addmore]
+      redirect '/t/new?addmore=true'
+    else
+      redirect session[:recent_list_url] || "/"
+    end
   else
     redirect '/t/new'
   end
@@ -266,10 +270,17 @@ __END__
       %td 
         %textarea{:rows => 15, :cols => 30, :name => 'description'}              
     %tr
-      %th Tags
+      %th 
+        %span Tags
+        %small (comma delimited)
       %td
         %input{:name => 'tags', :size => 30}
-        %small (comma delimited)
+    %tr
+      %th 
+      %td
+        %label{:for => "addmore"} 
+          %input{:type => "checkbox", :value => "1",:id => "addmore", :name => "addmore", :checked => (params["addmore"] ? "checked" : nil)}
+          %span Add another ticket
     %tr
       %td
       %td
@@ -371,6 +382,9 @@ table.twocol
 table
   font-size: 100%
   border-collapse: collapse
+  th
+    small
+      font-weight: normal
   td,th
     vertical-align: top
   tr.even
