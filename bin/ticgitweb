@@ -77,16 +77,43 @@ get '/sv/:saved_view' do
   haml :list, :locals => {:title => "All tickets in view '#{params[:saved_view]}'"}  
 end
 
-# ticket single view
-get '/ticket/:ticket' do
+
+# new ticket
+get '/tickets/new' do
+  haml :new, :locals => {:title => "Create new ticket"}
+end
+
+# create ticket
+post '/tickets' do 
+  title = params[:title].to_s.strip
+  if title.size > 1
+    tags = params[:tags].split(',').map { |t| t.strip } rescue nil  
+    t = $ticgit.ticket_new(title, {:description => params[:description].strip, :tags => tags})
+    if params[:addmore]
+      redirect '/tickets/new?addmore=true'
+    else
+      redirect session[:recent_list_url] || "/"
+    end
+  else
+    redirect '/tickets/new'
+  end  
+end
+
+# show ticket
+get '/tickets/:ticket' do
   @ticket = $ticgit.ticket_show(params[:ticket])
   haml :show, :locals => {:title => "Ticket #{@ticket.ticket_id}"}
 end
 
 # update ticket
-put '/ticket/:ticket' do
+put '/tickets/:ticket' do
   @ticket = $ticgit.ticket_show(params[:ticket])
+  orig_state = nil
+  new_state = nil
+  new_tags = nil
   if params[:state] && $ticgit.tic_states.include?(params[:state]) && @ticket.state != params[:state]
+    orig_state = @ticket.state
+    new_state = params[:state]
     @ticket.change_state(params[:state])
   end
   if params[:tags]
@@ -96,57 +123,25 @@ put '/ticket/:ticket' do
     tags_to_add = posted_tags - current_tags
     tags_to_remove.each{|t| @ticket.remove_tag(t) }
     tags_to_add.each{|t| @ticket.add_tag(t) }
+    new_tags = posted_tags if tags_to_remove.any? || tags_to_add.any?
   end
-  $ticgit.reset_ticgit
   
-  redirect "/ticket/#{@ticket.ticket_id}"
-end
-
-
-# add ticket
-get '/t/new' do
-  haml :new, :locals => {:title => "Create new ticket"}
-end
-
-# add ticket finalize
-post '/t/new' do
-  title = params[:title].to_s.strip
-  if title.size > 1
-    tags = params[:tags].split(',').map { |t| t.strip } rescue nil  
-    t = $ticgit.ticket_new(title, {:description => params[:description].strip, :tags => tags})
-    if params[:addmore]
-      redirect '/t/new?addmore=true'
-    else
-      redirect session[:recent_list_url] || "/"
-    end
-  else
-    redirect '/t/new'
+  if params[:comment] && params[:comment].strip != ""
+    comment = ""
+    comment = "Set state from #{orig_state} to #{new_state}\n\n" if new_state
+    @ticket.add_comment(comment + params[:comment])
   end
-end
-
-# add comment
-post '/a/add_comment/:ticket' do
-  t = $ticgit.ticket_comment(params[:comment], params[:ticket])
-  redirect '/ticket/' + params[:ticket]
-end
-
-# add tag
-post '/a/add_tags/:ticket' do
-  t = $ticgit.ticket_tag(params[:tags], params[:ticket])
-  redirect '/ticket/' + params[:ticket]
-end
-
-# change ticket state
-get '/a/change_state/:ticket/:state' do
-  $ticgit.ticket_change(params[:state], params[:ticket])
+  
+  $ticgit.reset_ticgit
   
   if ["resolved","invalid"].include?(params[:state]) && session[:recent_list_url]
     # If the ticket is resolved or invalid return to the last listview
     redirect session[:recent_list_url]
   else
-    redirect '/ticket/' + params[:ticket]
-  end
+    redirect "/tickets/#{@ticket.ticket_id}"
+  end  
 end
+
 
 ## Helper methods
 
@@ -170,7 +165,7 @@ __END__
   %body
     #wrapper
       #action
-        %a{:href => '/t/new'} New Ticket    
+        %a{:href => '/tickets/new'} New Ticket    
       %ul#navigation        
         %li 
           %a{:href => '/'} All
@@ -210,11 +205,11 @@ __END__
       - @tickets.each do |t|
         %tr{:class => (c == 'even' ? c = 'odd' : c = 'even') }
           %td
-            %a{:href => "/ticket/#{t.ticket_id}" }
+            %a{:href => "/tickets/#{t.ticket_id}" }
               %code= t.ticket_id[0,6]
           %td
             %strong
-              %a{:href => "/ticket/#{t.ticket_id}" }= t.title
+              %a{:href => "/tickets/#{t.ticket_id}" }= t.title
             .content~ t.description
           %td
             %span{:class => "state " + t.state, :style => "float: left;"}= t.state
@@ -242,7 +237,7 @@ __END__
   
 .content~ @ticket.description
 %hr/
-%form{:action => "/ticket/#{@ticket.ticket_id}", :method => 'post'}
+%form{:action => "/tickets/#{@ticket.ticket_id}", :method => 'post'}
   %input{:type => "hidden", :name => "_method", :value => "put"}
   %table.twocol
     %tr
@@ -258,10 +253,16 @@ __END__
       %td
         %textarea{:rows => 2, :name => "tags",  :style => "width: 50%"}= @ticket.tags.join(", ")
     %tr
+      %th 
+        Comment 
+        %small (optional)
+      %td
+        %textarea{:rows => 3, :name => "comment",  :style => "width: 100%"}
+    %tr
       %th
       %td
         %div.submit
-          %input{:type => 'submit', :value => 'Save ticket'}
+          %input{:type => 'submit', :value => 'Update ticket'}
 
 %h3 Comments
     
@@ -274,19 +275,11 @@ __END__
         by
         = t.user
     %div.comment-text
-      = t.comment
-    %br
-
-%form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'post'}
-  %h4 Add comment
-  %textarea{:name => 'comment', :cols => 50}
-  .submit  
-    %input{:type => 'submit', :value => 'add comment'}
-
+      = t.comment.gsub("\n","<br/>")
 
 @@ new
 %h1 Create a New Ticket
-%form{:action => '/t/new', :method => 'post'}
+%form{:action => '/tickets/new', :method => 'post'}
   %table
     %tr
       %th Title
@@ -440,6 +433,7 @@ a.tag
   .comment-text
     padding: 4px
     padding-bottom: 10px
+    margin-bottom: 10px
     color: #333
     border-bottom: 1px solid #aaa
   
