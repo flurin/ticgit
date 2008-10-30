@@ -83,6 +83,25 @@ get '/ticket/:ticket' do
   haml :show, :locals => {:title => "Ticket #{@ticket.ticket_id}"}
 end
 
+# update ticket
+put '/ticket/:ticket' do
+  @ticket = $ticgit.ticket_show(params[:ticket])
+  if params[:state] && $ticgit.tic_states.include?(params[:state]) && @ticket.state != params[:state]
+    @ticket.change_state(params[:state])
+  end
+  if params[:tags]
+    current_tags = @ticket.tags
+    posted_tags = params[:tags].split(",").map{|s| s.strip }
+    tags_to_remove = current_tags - posted_tags
+    tags_to_add = posted_tags - current_tags
+    tags_to_remove.each{|t| @ticket.remove_tag(t) }
+    tags_to_add.each{|t| @ticket.add_tag(t) }
+  end
+  $ticgit.reset_ticgit
+  
+  redirect "/ticket/#{@ticket.ticket_id}"
+end
+
 
 # add ticket
 get '/t/new' do
@@ -197,7 +216,8 @@ __END__
             %strong
               %a{:href => "/ticket/#{t.ticket_id}" }= t.title
             .content~ t.description
-          %td{:class => t.state}= t.state
+          %td
+            %span{:class => "state " + t.state, :style => "float: left;"}= t.state
           %td= t.opened.strftime("%m/%d")
           %td= t.assigned_name
           %td
@@ -205,45 +225,45 @@ __END__
               %a.tag{:href => "/tag/#{tag}"}= tag
 
 @@ show
-%h1= @ticket.title
+%h1
+  = @ticket.title
+.meta
+  %span{:class => "state " + @ticket.state}= @ticket.state
+  Ticket:
+  = @ticket.ticket_id
+  %br
+  opened at
+  %em= @ticket.opened.strftime("%Y-%m-%d")
+  assigned to 
+  %em= @ticket.assigned
+  tagged with
+  - @ticket.tags.each do |t|
+    %a.tag{:href => "/tag/#{t}"}= t
+  
 .content~ @ticket.description
 %hr/
-%form{:action => "/a/add_tags/#{@ticket.ticket_id}", :method => 'post'}
+%form{:action => "/ticket/#{@ticket.ticket_id}", :method => 'post'}
+  %input{:type => "hidden", :name => "_method", :value => "put"}
   %table.twocol
     %tr
-      %th TicId
-      %td
-        %code= @ticket.ticket_id
-    %tr
-      %th Assigned
-      %td= @ticket.assigned
-    %tr
-      %th Opened
-      %td= @ticket.opened
-    %tr
       %th State
-      %td{:class => @ticket.state}
-        %table{:width => '300'}
-          %tr
-            %td{:width=>'90%'}= @ticket.state
-            - $ticgit.tic_states.select { |s| s != @ticket.state}.each do |st|
-              %td{:class => st}
-                %a{:href => "/a/change_state/#{@ticket.ticket_id}/#{st}"}= st[0,2]
-    %tr
-      %th Tags
       %td
-        - @ticket.tags.each do |t|
-          %a.tag{:href => "/tag/#{t}"}= t
-        %div.addtag
-          %input{:name => 'tags'}
-          %input{:type => 'submit', :value => 'add tag'}
+        %select{:name => "state", :id => "ticket_state"}
+          - $ticgit.tic_states.each do |ts|
+            %option{:value => ts , :selected => (@ticket.state == ts ? "selected" : nil)}= ts
+    %tr
+      %th 
+        Tags
+        %small (comma delimited)        
+      %td
+        %textarea{:rows => 2, :name => "tags",  :style => "width: 50%"}= @ticket.tags.join(", ")
+    %tr
+      %th
+      %td
+        %div.submit
+          %input{:type => 'submit', :value => 'Save ticket'}
 
 %h3 Comments
-%form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'post'}
-  %div
-    %textarea{:name => 'comment', :cols => 50}
-    %br
-    %input{:type => 'submit', :value => 'add comment'}
     
 %div.comments
   - @ticket.comments.reverse.each do |t|
@@ -257,6 +277,13 @@ __END__
       = t.comment
     %br
 
+%form{:action => "/a/add_comment/#{@ticket.ticket_id}", :method => 'post'}
+  %h4 Add comment
+  %textarea{:name => 'comment', :cols => 50}
+  .submit  
+    %input{:type => 'submit', :value => 'add comment'}
+
+
 @@ new
 %h1 Create a New Ticket
 %form{:action => '/t/new', :method => 'post'}
@@ -264,17 +291,17 @@ __END__
     %tr
       %th Title
       %td 
-        %input{:type => 'text', :name => 'title', :size => 30}
+        %input{:type => 'text', :name => 'title', :size => 30, :style => "width: 100%"}
     %tr
       %th Description
       %td 
-        %textarea{:rows => 15, :cols => 30, :name => 'description'}              
+        %textarea{:rows => 15, :cols => 30, :name => 'description', :style => "width: 100%"}              
     %tr
       %th 
         %span Tags
         %small (comma delimited)
       %td
-        %input{:name => 'tags', :size => 30}
+        %textarea{:name => 'tags', :rows => 2, :style => "width: 50%"}
     %tr
       %th 
       %td
@@ -339,10 +366,52 @@ body
   
 .addtag
   padding: 5px 0
+  clear: both
   
 h1
   display: block
   padding-bottom: 5px
+  margin-bottom: 0
+
+h4
+  margin: 0 0 0.5em 0
+
+div.meta
+  margin-bottom: 1em
+  display: block
+  font-size: 0.9em
+  font-weight: normal
+  color: #666
+  em
+    color: #000
+    font-style: normal
+    font-weight: bold
+  a.tag
+    font-size: 1em
+    float: none
+    background: #eee
+    color: #000
+  span.state
+    float: left
+    margin-right: 1em
+    color: #000
+
+div.content
+  padding-top: 1em
+  clear: both
+
+form
+  padding: 10px
+  background: #f2f2f2
+  table
+    width: 100%
+    tr
+      th
+        width: 20%
+      th,td
+        border-bottom: none
+  .submit
+    margin: 0.5em 0 0 0
 
 a
   color: black
@@ -362,22 +431,37 @@ a.tag
   text-decoration: none
 
 .comments
-  margin: 10px 20px
+  margin: 10px 0px
   .comment
     .head
-      background: #eee
+      font-weight: bold
+      display: block
       padding: 4px
-    .comment-text
-      padding: 10px
-      color: #333
+  .comment-text
+    padding: 4px
+    padding-bottom: 10px
+    color: #333
+    border-bottom: 1px solid #aaa
   
 table.long
   width: 100%
+  .content
+    padding: 0
 
-table.twocol
-  background: #f2f2f2
-  th
-    width: 30%
+
+// States
+span.state
+  padding: 3px
+
+span.open
+  background: #ada
+span.resolved
+  background: #abd
+span.hold
+  background: #dda
+span.invalid
+  background: #aaa  
+
 
 table
   font-size: 100%
@@ -404,14 +488,6 @@ table
       vertical-align: top
     th.ticket
       width: 50%
-    td.open
-      background: #ada
-    td.resolved
-      background: #abd
-    td.hold
-      background: #dda
-    td.invalid
-      background: #aaa  
 
 strong a
   text-decoration: none
