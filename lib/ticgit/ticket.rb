@@ -71,8 +71,10 @@ module TicGit
     
     
     def self.parse_ticket_name(name)
-      epoch, title, rand = name.split('_')
-      title = title.gsub('-', ' ')
+      unless name =~ /^([^_]+)_(.+)_([^_]+)$/
+        raise "invalid ticket name #{name.inspect}"
+      end
+      epoch, title, rand = $1, $2.gsub('-', ' '), $3
       return [title, Time.at(epoch.to_i)]
     end
     
@@ -114,7 +116,7 @@ module TicGit
     end
     
     def self.clean_string(string)
-      string.downcase.gsub(/[^a-z0-9]+/i, '-')
+      string.downcase.gsub(/[^a-zA-Z0-9_:;,.]+/, '-')
     end
     
     def add_comment(comment)
