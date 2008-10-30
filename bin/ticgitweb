@@ -27,6 +27,11 @@ gem 'sinatra', ">= 0.3.1"
 end
 
 
+configure do
+  enable :sessions
+end
+use_in_file_templates!
+
 # !! TODO : if ARGV[1] is a path to a git repo, use that
 # otherwise, look in ~/.ticgit
 
@@ -50,21 +55,25 @@ end
 # ticket list view
 get '/' do
   @tickets = $ticgit.ticket_list(:order => 'date.desc')
+  store_list_url!  
   haml :list, :locals => {:title => "All tickets"}
 end
 
 get '/fs/:state' do
   @tickets = $ticgit.ticket_list(:state => params[:state], :order => 'date.desc')
+  store_list_url!  
   haml :list, :locals => {:title => "#{params[:state].to_s.capitalize} tickets"}  
 end
 
 get '/tag/:tag' do
   @tickets = $ticgit.ticket_list(:tag => params[:tag], :order => 'date.desc')
+  store_list_url!  
   haml :list, :locals => {:title => "All tickets with tag '#{params[:tag]}'"}
 end
 
 get '/sv/:saved_view' do
   @tickets = $ticgit.ticket_list(:saved => params[:saved_view])
+  store_list_url!  
   haml :list, :locals => {:title => "All tickets in view '#{params[:saved_view]}'"}  
 end
 
@@ -92,7 +101,6 @@ post '/t/new' do
   end
 end
 
-
 # add comment
 post '/a/add_comment/:ticket' do
   t = $ticgit.ticket_comment(params[:comment], params[:ticket])
@@ -108,10 +116,22 @@ end
 # change ticket state
 get '/a/change_state/:ticket/:state' do
   $ticgit.ticket_change(params[:state], params[:ticket])
-  redirect '/ticket/' + params[:ticket]
+  
+  if ["resolved","invalid"].include?(params[:state]) && session[:recent_list_url]
+    # If the ticket is resolved or invalid return to the last listview
+    redirect session[:recent_list_url]
+  else
+    redirect '/ticket/' + params[:ticket]
+  end
 end
 
-use_in_file_templates!
+## Helper methods
+
+# 
+def store_list_url!
+  session[:recent_list_url] = request.fullpath
+end
+
 
 __END__
 @@ layout
