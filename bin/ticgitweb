@@ -279,7 +279,7 @@ __END__
 
 @@ new
 %h1 Create a New Ticket
-%form{:action => '/tickets/new', :method => 'post'}
+%form{:action => '/tickets', :method => 'post'}
   %table
     %tr
       %th Title
