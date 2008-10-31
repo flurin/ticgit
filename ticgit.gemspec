@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name      = "ticgit"
-  s.version   = "0.3.7"
+  s.version   = "0.3.7.1"
   s.date      = "2008-09-11"
                 
   s.authors   = ["Scott Chacon", "Mislav Marohnić", "Flurin Egger"]
