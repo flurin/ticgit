@@ -20,7 +20,7 @@ end
 require_dependency_with_check 'rubygems'
 
 # We need a sinatra version bigger than 0.3.1
-gem 'sinatra', ">= 0.3.1"
+gem 'sinatra', "~> 0.3.1"
 
 %w(sinatra git ticgit haml sass).each do |dependency| 
   require_dependency_with_check dependency

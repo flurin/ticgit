@@ -25,6 +25,6 @@ Gem::Specification.new do |s|
   s.has_rdoc = false
   
   s.add_dependency "schacon-git", ["~> 1.0.5"]
-  s.add_dependency "sinatra", ["=> 0.3.1"]
+  s.add_dependency "sinatra", ["~> 0.3.1"]
   s.add_dependency "wycats-thor", ["~> 0.9.5"]
 end
